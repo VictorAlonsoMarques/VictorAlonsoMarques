@@ -8,11 +8,11 @@ I run [alonsite.es](https://alonsite.es) — a technical blog in Spanish/English
 
 | Repo | What it is |
 |---|---|
-| [**aceproxy-jellyfin**](https://github.com/victoralonso/aceproxy-jellyfin) | AceStream HTTP proxy with multi-client support and auto-fallback. Powers football+F1 on my Jellyfin Live TV. |
-| [**bookstack-to-blog-publisher**](https://github.com/victoralonso/bookstack-to-blog-publisher) | The stack behind alonsite.es: BookStack → static HTML + AI-suggested SEO + safety checks for client data. ~400 LOC. |
-| [**proxmox-homelab-snippets**](https://github.com/victoralonso/proxmox-homelab-snippets) | Bash one-liners for Proxmox VE: bulk snapshots, no-subscription patch, health reports. |
-| [**cloudflare-tunnel-templates**](https://github.com/victoralonso/cloudflare-tunnel-templates) | Production-tested `cloudflared` configs for Jellyfin, BookStack, Proxmox & friends. |
-| [**intune-powershell-snippets**](https://github.com/victoralonso/intune-powershell-snippets) | Copy-paste PowerShell for daily Intune / Entra ID admin work. |
+| [**aceproxy-jellyfin**](https://github.com/VictorAlonsoMarques/aceproxy-jellyfin) | AceStream HTTP proxy with multi-client support and auto-fallback. Powers football+F1 on my Jellyfin Live TV. |
+| [**bookstack-to-blog-publisher**](https://github.com/VictorAlonsoMarques/bookstack-to-blog-publisher) | The stack behind alonsite.es: BookStack → static HTML + AI-suggested SEO + safety checks for client data. ~400 LOC. |
+| [**proxmox-homelab-snippets**](https://github.com/VictorAlonsoMarques/proxmox-homelab-snippets) | Bash one-liners for Proxmox VE: bulk snapshots, no-subscription patch, health reports. |
+| [**cloudflare-tunnel-templates**](https://github.com/VictorAlonsoMarques/cloudflare-tunnel-templates) | Production-tested `cloudflared` configs for Jellyfin, BookStack, Proxmox & friends. |
+| [**intune-powershell-snippets**](https://github.com/VictorAlonsoMarques/intune-powershell-snippets) | Copy-paste PowerShell for daily Intune / Entra ID admin work. |
 
 ## What I write about
 
