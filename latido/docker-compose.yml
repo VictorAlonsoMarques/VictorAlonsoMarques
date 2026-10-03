@@ -1,0 +1,22 @@
+services:
+  latido:
+    build: .
+    restart: unless-stopped
+    env_file: .env
+    volumes:
+      - ./data:/data
+    ports:
+      - "127.0.0.1:3000:3000"
+
+  # Publica la app con Cloudflare Tunnel sin abrir puertos en el servidor.
+  # Crea el túnel en Cloudflare Zero Trust, apunta el hostname a http://latido:3000
+  # y pon el token en CLOUDFLARE_TUNNEL_TOKEN dentro de .env.
+  cloudflared:
+    image: cloudflare/cloudflared:latest
+    restart: unless-stopped
+    command: tunnel --no-autoupdate run
+    environment:
+      - TUNNEL_TOKEN=${CLOUDFLARE_TUNNEL_TOKEN}
+    depends_on:
+      - latido
+    profiles: ["tunnel"]
