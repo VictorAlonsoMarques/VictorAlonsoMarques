@@ -13,6 +13,12 @@ function mailer() {
   return transport;
 }
 
+export async function sendEmail(to, subject, text) {
+  const m = mailer();
+  if (!m) return console.log(`[email sin SMTP] ${to}: ${subject}\n${text}`);
+  await m.sendMail({ from: config.smtp.from, to, subject: `[${config.brand}] ${subject}`, text });
+}
+
 // Envía la alerta por los canales que tenga configurados el usuario.
 // Los fallos se registran pero nunca rompen el bucle de comprobaciones.
 export async function notify(user, subject, text) {

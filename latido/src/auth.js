@@ -39,3 +39,26 @@ export function userFromSession(db, token) {
 export function deleteSession(db, token) {
   db.prepare('DELETE FROM sessions WHERE token = ?').run(token);
 }
+
+const sha256 = (t) => crypto.createHash('sha256').update(t).digest('hex');
+
+// Devuelve un token de un solo uso válido 1 hora, o null si el email no existe.
+export function createResetToken(db, email) {
+  const u = db.prepare('SELECT id FROM users WHERE email = ?').get(String(email || '').trim().toLowerCase());
+  if (!u) return null;
+  const token = crypto.randomBytes(32).toString('hex');
+  db.prepare('INSERT INTO password_resets (token_hash, user_id, expires_at) VALUES (?, ?, ?)').run(sha256(token), u.id, Date.now() + 3600e3);
+  return token;
+}
+
+export function resetPassword(db, token, password) {
+  if (String(password || '').length < 8) throw new Error('La contraseña debe tener al menos 8 caracteres.');
+  const r = db.prepare('SELECT * FROM password_resets WHERE token_hash = ? AND used = 0 AND expires_at > ?').get(sha256(String(token || '')), Date.now());
+  if (!r) throw new Error('El enlace no es válido o ha caducado. Pide uno nuevo.');
+  db.transaction(() => {
+    db.prepare('UPDATE password_resets SET used = 1 WHERE user_id = ?').run(r.user_id);
+    db.prepare('UPDATE users SET password_hash = ? WHERE id = ?').run(bcrypt.hashSync(password, 10), r.user_id);
+    db.prepare('DELETE FROM sessions WHERE user_id = ?').run(r.user_id);
+  })();
+  return r.user_id;
+}

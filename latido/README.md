@@ -10,7 +10,9 @@ Monitorización de webs y página de estado, en español, para pymes, autónomos
 - Alertas de caída y recuperación por email (SMTP) y Telegram.
 - Aviso 14 días antes de que caduque el certificado SSL.
 - Página de estado pública por cliente (`/s/<id>`) con barras de las últimas comprobaciones y uptime de 30 días.
-- Límites por plan (Gratis 5 monitores / 5 min, Pro 50 / 1 min, Agencia 200 / 30 s). El cobro con Stripe es la siguiente fase; de momento el plan se cambia a mano en la base de datos.
+- Límites por plan (Gratis 5 monitores / 5 min, Pro 50 / 1 min, Agencia 200 / 30 s).
+- Suscripciones con Stripe: Checkout para pagar, portal del cliente para cambiar o cancelar y facturas, y webhooks que activan o bajan el plan.
+- Recuperar contraseña con enlace por email de un solo uso (1 hora).
 - Protección para que nadie pueda usar el monitor contra la red interna del servidor (Proxmox, IPs privadas, localhost).
 
 Stack: Node 22, Hono, SQLite (better-sqlite3). Un solo contenedor, sin dependencias externas.
@@ -37,10 +39,15 @@ Para dar plan Pro a un usuario a mano:
 docker compose exec latido node -e "const D=require('better-sqlite3');new D('/data/latido.db').prepare(\"UPDATE users SET plan='pro' WHERE email=?\").run('cliente@ejemplo.es')"
 ```
 
+## Configurar Stripe
+1. Crea los productos Pro (9 €/mes) y Agencia (29 €/mes) con precio recurrente y copia sus `price_...` a `STRIPE_PRICE_PRO` y `STRIPE_PRICE_AGENCY`.
+2. Crea un webhook a `https://TU-DOMINIO/stripe/webhook` con los eventos `checkout.session.completed`, `customer.subscription.created`, `customer.subscription.updated` y `customer.subscription.deleted`, y copia su secreto a `STRIPE_WEBHOOK_SECRET`.
+3. Activa el portal del cliente en Stripe (Settings → Billing → Customer portal).
+4. Prueba primero con las claves de test (`sk_test_...`).
+
 ## Siguientes pasos
-- Pagos con Stripe (Checkout + portal del cliente + webhooks).
 - Sonda externa en un segundo VPS para confirmar caídas desde otra red.
 - Dominio propio en la página de estado (plan Pro) y marca blanca (Agencia).
 - Informes mensuales en PDF para agencias.
-- Recuperar contraseña por email, verificación de email y textos legales.
+- Verificación de email y textos legales (aviso legal, privacidad, cookies).
 - Herramientas gratuitas para SEO: "¿Está caída [web]?", comprobador SSL.

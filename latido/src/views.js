@@ -29,7 +29,7 @@ footer{text-align:center;color:var(--muted);font-size:14px;padding:32px 16px}
 
 export function layout({ title, user, body, plain = false }) {
   const nav = plain ? '' : user
-    ? `<nav><a href="/app">Monitores</a><a href="/app/ajustes">Ajustes</a><form method="post" action="/salir" style="display:inline;margin-left:16px"><button class="link">Salir</button></form></nav>`
+    ? `<nav><a href="/app">Monitores</a><a href="/app/plan">Plan</a><a href="/app/ajustes">Ajustes</a><form method="post" action="/salir" style="display:inline;margin-left:16px"><button class="link">Salir</button></form></nav>`
     : `<nav><a href="/entrar">Entrar</a><a href="/registro" class="btn" style="color:#fff">Empieza gratis</a></nav>`;
   return `<!doctype html><html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>${esc(title)} · ${esc(config.brand)}</title><style>${css}</style></head><body>

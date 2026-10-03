@@ -57,7 +57,18 @@ export function openDb(file) {
       resolved_at INTEGER,
       cause TEXT
     );
+    CREATE TABLE IF NOT EXISTS password_resets (
+      token_hash TEXT PRIMARY KEY,
+      user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      expires_at INTEGER NOT NULL,
+      used INTEGER NOT NULL DEFAULT 0
+    );
   `);
+  // Migraciones sencillas: columnas añadidas después de la primera versión.
+  const cols = new Set(db.prepare('PRAGMA table_info(users)').all().map((c) => c.name));
+  for (const col of ['stripe_customer_id TEXT', 'stripe_subscription_id TEXT']) {
+    if (!cols.has(col.split(' ')[0])) db.exec(`ALTER TABLE users ADD COLUMN ${col}`);
+  }
   return db;
 }
 

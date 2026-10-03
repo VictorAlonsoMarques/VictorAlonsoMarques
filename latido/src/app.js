@@ -2,7 +2,9 @@ import { Hono } from 'hono';
 import { getCookie, setCookie, deleteCookie } from 'hono/cookie';
 import { config, plans } from './config.js';
 import { uptime } from './db.js';
-import { createUser, verifyUser, createSession, userFromSession, deleteSession } from './auth.js';
+import { createUser, verifyUser, createSession, userFromSession, deleteSession, createResetToken, resetPassword } from './auth.js';
+import { sendEmail } from './notify.js';
+import { checkoutUrl, portalUrl, verifyWebhook, handleEvent } from './billing.js';
 import { layout, esc, fmtPct, statusLabel, bars } from './views.js';
 
 const COOKIE = 'sid';
@@ -32,6 +34,17 @@ export function buildApp(db) {
   };
 
   app.get('/health', (c) => c.text('ok'));
+
+  app.post('/stripe/webhook', async (c) => {
+    let event;
+    try {
+      event = await verifyWebhook(await c.req.text(), c.req.header('stripe-signature'));
+    } catch (e) {
+      return c.text(`Webhook no válido: ${e.message}`, 400);
+    }
+    handleEvent(db, event);
+    return c.json({ received: true });
+  });
 
   app.get('/', (c) => page(c, 'Monitoriza tu web', `
     <section class="hero">
@@ -70,12 +83,40 @@ export function buildApp(db) {
       return page(c, 'Crear cuenta', authForm('/registro', 'Crea tu cuenta gratis', 'Crear cuenta', e.message, '¿Ya tienes cuenta? <a href="/entrar">Entra</a>'));
     }
   });
-  app.get('/entrar', (c) => page(c, 'Entrar', authForm('/entrar', 'Entrar', 'Entrar', null, '¿No tienes cuenta? <a href="/registro">Regístrate gratis</a>')));
+  app.get('/entrar', (c) => page(c, 'Entrar', authForm('/entrar', 'Entrar', 'Entrar', null, '¿No tienes cuenta? <a href="/registro">Regístrate gratis</a> · <a href="/recuperar">He olvidado mi contraseña</a>')));
   app.post('/entrar', async (c) => {
     const f = await c.req.parseBody();
     const u = verifyUser(db, f.email, f.password);
-    if (!u) return page(c, 'Entrar', authForm('/entrar', 'Entrar', 'Entrar', 'Email o contraseña incorrectos.', '¿No tienes cuenta? <a href="/registro">Regístrate gratis</a>'));
+    if (!u) return page(c, 'Entrar', authForm('/entrar', 'Entrar', 'Entrar', 'Email o contraseña incorrectos.', '¿No tienes cuenta? <a href="/registro">Regístrate gratis</a> · <a href="/recuperar">He olvidado mi contraseña</a>'));
     return login(c, u.id);
+  });
+
+  const card = (inner) => `<div class="card" style="max-width:420px;margin:40px auto">${inner}</div>`;
+  app.get('/recuperar', (c) => page(c, 'Recuperar contraseña', card(`
+    <h2>Recuperar contraseña</h2><form method="post" action="/recuperar">
+    <label>Email</label><input name="email" type="email" required><p><button>Enviar enlace</button></p></form>`)));
+  app.post('/recuperar', async (c) => {
+    const f = await c.req.parseBody();
+    const token = createResetToken(db, f.email);
+    if (token) {
+      await sendEmail(String(f.email).trim().toLowerCase(), 'Restablece tu contraseña',
+        `Para elegir una contraseña nueva entra en este enlace (caduca en 1 hora):\n\n${config.baseUrl}/restablecer?token=${token}\n\nSi no lo has pedido tú, ignora este email.`)
+        .catch((e) => console.error('Error enviando email de recuperación:', e.message));
+    }
+    // Misma respuesta exista o no la cuenta, para no revelar qué emails están registrados.
+    return page(c, 'Recuperar contraseña', card('<p class="ok">Si hay una cuenta con ese email, te hemos enviado un enlace para restablecer la contraseña.</p>'));
+  });
+  const resetForm = (token, error) => card(`<h2>Nueva contraseña</h2>${error ? `<p class="err">${esc(error)}</p>` : ''}
+    <form method="post" action="/restablecer"><input type="hidden" name="token" value="${esc(token)}">
+    <label>Contraseña nueva</label><input name="password" type="password" required minlength="8"><p><button>Guardar</button></p></form>`);
+  app.get('/restablecer', (c) => page(c, 'Nueva contraseña', resetForm(c.req.query('token'))));
+  app.post('/restablecer', async (c) => {
+    const f = await c.req.parseBody();
+    try {
+      return login(c, resetPassword(db, f.token, f.password));
+    } catch (e) {
+      return page(c, 'Nueva contraseña', resetForm(f.token, e.message));
+    }
   });
   app.post('/salir', (c) => {
     const t = getCookie(c, COOKIE);
@@ -183,6 +224,34 @@ export function buildApp(db) {
       String(f.telegram_chat_id || '').replace(/[^0-9-]/g, '') || null,
       c.get('user').id);
     return c.redirect('/app/ajustes?ok=1');
+  });
+
+  const prices = { pro: '9 €/mes', agency: '29 €/mes' };
+  app.get('/app/plan', requireUser, (c) => {
+    const u = c.get('user');
+    const msg = c.req.query('ok') ? '<p class="ok">¡Gracias! Tu plan se activará en unos segundos.</p>'
+      : c.req.query('error') ? `<p class="err">${esc(c.req.query('error'))}</p>` : '';
+    const box = (key) => `<div class="card"><h3>${plans[key].name}${u.plan === key ? ' <small class="muted">(tu plan)</small>' : ''}</h3>
+      <p class="muted">${plans[key].maxMonitors} monitores · cada ${plans[key].minInterval < 60 ? plans[key].minInterval + ' s' : plans[key].minInterval / 60 + ' min'}</p>
+      ${key === 'free' ? '<div class="price">0 €</div>' : `<div class="price">${prices[key]}</div>${u.plan === key ? '' : `<form method="post" action="/app/plan/checkout"><input type="hidden" name="plan" value="${key}"><p><button>Elegir ${plans[key].name}</button></p></form>`}`}</div>`;
+    return page(c, 'Plan', `<h1>Tu plan</h1>${msg}<div class="grid">${['free', 'pro', 'agency'].map(box).join('')}</div>
+      ${u.stripe_customer_id ? '<form method="post" action="/app/plan/portal"><button class="link">Gestionar suscripción y facturas</button></form>' : ''}`);
+  });
+  app.post('/app/plan/checkout', requireUser, async (c) => {
+    const f = await c.req.parseBody();
+    if (!['pro', 'agency'].includes(f.plan)) return c.redirect('/app/plan');
+    try {
+      return c.redirect(await checkoutUrl(db, c.get('user'), f.plan), 303);
+    } catch (e) {
+      return c.redirect('/app/plan?error=' + encodeURIComponent(e.message));
+    }
+  });
+  app.post('/app/plan/portal', requireUser, async (c) => {
+    try {
+      return c.redirect(await portalUrl(c.get('user')), 303);
+    } catch (e) {
+      return c.redirect('/app/plan?error=' + encodeURIComponent(e.message));
+    }
   });
 
   // Página de estado pública
